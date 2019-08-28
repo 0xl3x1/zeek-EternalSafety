@@ -1,0 +1,4 @@
+[package]
+description = Detect traffic from the EternalBlue exploit (CVE-2017-0144).
+tags = SMB, Windows, attack, notice
+script_dir = scripts
