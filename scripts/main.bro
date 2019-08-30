@@ -3,6 +3,9 @@ module EternalSafety;
 # Set to True to enable some debug prints
 const DEBUG = T;
 
+# for producing Wireshark-readable timestamps when DEBUG==T
+global first_time: time = 0;
+
 export {
     redef enum Notice::Type += {
         EternalBlue,     # => possible EternalBlue exploit
@@ -16,12 +19,24 @@ export {
     type SMBTransID: record {
         pid: count; # Process ID
         mid: count; # Multiplex ID
-        # tid: count; # Tree ID
-        # uid: count; # User ID
+        tid: count; # Tree ID
+        uid: count; # User ID
+    };
+
+    type SMBStreamID: record {
+        pid: count; # Process ID
+        mid: count; # Multiplex ID
     };
 
     # Table to track SMBv1 transactions per connection
-    type SMBTransTable: table[SMBTransID] of vector of count;
+    # use a set here because for our TXn invariants we don't care about
+    # command sequence
+    type SMBTransTable: table[SMBTransID] of set[count];
+
+    # Table to track streams per connection
+    # use a vector because we do care about command sequence for
+    # some of our stream-related invariants
+    type SMBStreamTable: table[SMBStreamID] of vector of count;
 
     # Set of notice types
     type NoticeSet: set[Notice::Type];
@@ -34,18 +49,18 @@ export {
 }
 
 redef record connection += {
-    # track current SMBv1 transaction parameters
+    # track SMBv1 transactions within the connection
     es_smb_trans: SMBTransTable &default=SMBTransTable();
-
-    # track all seen SMBv1 transaction parameters
     es_current_smb_trans: SMBTransID &optional;
+
+    # track SMB connection streams
+    es_smb_streams: SMBStreamTable &default=SMBStreamTable();
+    es_current_smb_stream: SMBStreamID &optional;
 
     # track whether we have warned about each type of exploit, so we only warn
     # once per connection
     es_notices_issued: NoticeSet &default=NoticeSet();
 };
-
-global first_time: time = 0;
 
 event bro_init()
     {
@@ -53,7 +68,7 @@ event bro_init()
 
 event connection_established(c: connection)
     {
-    if (first_time == 0)
+    if (DEBUG && first_time == 0)
         first_time = c$start_time;
     }
 
@@ -67,6 +82,8 @@ function notice(c: connection, n: Notice::Info)
         add c$es_notices_issued[n$note];
         if (DEBUG)
             {
+            # add Wireshark-readable timestamp in debug mode
+            # and print to stdout in addition to NOTICE()
             n$msg = fmt("t=%s: %s", 
                         interval_to_double(network_time()-first_time), n$msg);
             print n$msg;
@@ -78,10 +95,19 @@ function notice(c: connection, n: Notice::Info)
 # Track a new SMB command as part of the current SMB session
 function seen_smb_command(c: connection, command: count)
     {
+        # track transactions
         if (c$es_current_smb_trans !in c$es_smb_trans)
-            c$es_smb_trans[c$es_current_smb_trans] = vector(command);
+            c$es_smb_trans[c$es_current_smb_trans] = set(command);
         else 
-            c$es_smb_trans[c$es_current_smb_trans] += command;
+            add c$es_smb_trans[c$es_current_smb_trans][command];
+
+        # track the stream
+        if (c$es_current_smb_stream !in c$es_smb_streams)
+            c$es_smb_streams[c$es_current_smb_stream] = vector(command);
+        else 
+            c$es_smb_streams[c$es_current_smb_stream] += command;
+
+
     }
 
 # Server is not allowed to introduce a new MID into the stream.
@@ -94,7 +120,7 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header, is_
 
     # message is from server and is not preceeded by any corresponding message
     # from client, and this is the first message with this (pid, mid) combo
-    if (|c$es_smb_trans[c$es_current_smb_trans]| == 1)
+    if (|c$es_smb_streams[c$es_current_smb_stream]| == 1)
         {
         # These MID values in a Trans2 resp are usually used by DoublePulsar
         if (hdr$command == SMB_COM_TRANSACTION2 && hdr$mid >= 81 && hdr$mid <= 83)
@@ -126,10 +152,18 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
     {
         local current_trans: SMBTransID = [
             $pid = hdr$pid,
+            $mid = hdr$mid,
+            $tid = hdr$tid,
+            $uid = hdr$uid
+        ];
+
+        local current_stream: SMBStreamID = [
+            $pid = hdr$pid,
             $mid = hdr$mid
         ];
 
         c$es_current_smb_trans = current_trans;
+        c$es_current_smb_stream = current_stream;
 
         seen_smb_command(c, hdr$command);
 
