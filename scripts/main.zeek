@@ -1,19 +1,17 @@
 module EternalBlue;
-
+    
 export {
-    redef enum Log::ID += { LOG };
-
     redef enum Notice::Type += {
         EternalBlue,
         DoublePulsar,
     };
 
-    type : record {
-        ts: time &log;
-        id: conn_id &log;
-        smb_hdr: SMB1::Header &log;
-        msg: string &log;
-    };
+    # type : record {
+    #     ts: time &log;
+    #     id: conn_id &log;
+    #     smb_hdr: SMB1::Header &log;
+    #     msg: string &log;
+    # };
 
     # SMB transactions are identified by <pid, mid, tid, uid>
     type SMBTransID: record {
@@ -34,27 +32,17 @@ export {
 
 
 redef record connection += {
-    eternalblue: Info &optional;
     smb_trans: SMBTransTable &optional;
     current_smb_trans: EternalBlue::SMBTransID &optional;
 };
 
 event bro_init()
     {
-    Log::create_stream(EternalBlue::LOG, [$columns=Info, $path="EternalBlue"]);
     }
 
 event connection_established(c: connection)
     {
-    local rec: EternalBlue::Info = [
-        $ts = network_time(),
-        $id = c$id
-    ];
-    c$eternalblue = rec;
-
     c$smb_trans = table();
-
-    # Log::write(EternalBlue::LOG, rec);
     }
 
 function add_seen_smb_command(c: connection, command: count)
