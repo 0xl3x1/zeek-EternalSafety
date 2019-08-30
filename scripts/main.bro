@@ -27,8 +27,10 @@ export {
 redef record connection += {
     # track current SMBv1 transaction parameters
     smb_trans: SMBTransTable &optional;
+
     # track all seen SMBv1 transaction parameters
     current_smb_trans: SMBTransID &optional;
+
     # track whether we have warned about each type of exploit, so we only warn
     # once per connection
     eternal_blue_notice: bool &default=F;
@@ -45,7 +47,7 @@ event connection_established(c: connection)
     }
 
 # Track a new SMB command as part of the current SMB session
-function add_seen_smb_command(c: connection, command: count)
+function seen_smb_command(c: connection, command: count)
     {
         if (c$current_smb_trans !in c$smb_trans)
             c$smb_trans[c$current_smb_trans] = set(command);
@@ -65,7 +67,7 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
 
         c$current_smb_trans = current_trans;
 
-        add_seen_smb_command(c, hdr$command);
+        seen_smb_command(c, hdr$command);
 
         # print fmt("smb1_message: %2x", hdr$command);
 
