@@ -3,9 +3,6 @@ module EternalSafety;
 # Set to True to enable some debug prints
 const DEBUG = T;
 
-# for producing Wireshark-readable timestamps when DEBUG==T
-global first_time: time = 0;
-
 export {
     redef enum Notice::Type += {
         EternalBlue,     # => possible EternalBlue exploit
@@ -68,8 +65,6 @@ event bro_init()
 
 event connection_established(c: connection)
     {
-    if (DEBUG && first_time == 0)
-        first_time = c$start_time;
     }
 
 # Issues a new notice if such a notice hasn't already been issued for the
@@ -84,8 +79,7 @@ function notice(c: connection, n: Notice::Info)
             {
             # add Wireshark-readable timestamp in debug mode
             # and print to stdout in addition to NOTICE()
-            n$msg = fmt("t=%s: %s", 
-                        interval_to_double(network_time()-first_time), n$msg);
+            n$msg = fmt("t=%s: %s", network_time(), n$msg);
             print n$msg;
             }
         NOTICE(n);
