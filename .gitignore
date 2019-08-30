@@ -3,3 +3,4 @@ tags
 .state
 .btest*
 *.IGNORE
+scripts/*.log
