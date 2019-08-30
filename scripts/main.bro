@@ -1,4 +1,4 @@
-module EternalBlue;
+module EternalSafety;
     
 export {
     redef enum Notice::Type += {

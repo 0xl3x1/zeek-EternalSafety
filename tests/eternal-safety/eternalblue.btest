@@ -1,0 +1,2 @@
+# @TEST-EXEC: bro -C -r $TRACES/shadowbrokers/eternalblue-success-unpatched-win7.pcap ../../../scripts %INPUT
+# @TEST-EXEC: btest-diff notice.log
