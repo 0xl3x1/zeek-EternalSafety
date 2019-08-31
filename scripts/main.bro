@@ -1,20 +1,29 @@
 @load smb_consts
+@load-sigs main
 
 module EternalSafety;
     
 # Set to True to enable some debug prints
 const DEBUG = T;
 
+# Increase buffer size, since we rely on some signature matching
+# for EternalChampion (due to lacking SMBv1 event functionality in Bro)
+# TODO: Remove this when Bro's SMBv1 event support is complete and covers the
+#       SMB_COM_NT_TRANSACT* commands
+redef dpd_buffer_size = 8192;
+
 export {
     redef enum Notice::Type += {
-        EternalBlue,     # => possible EternalBlue exploit
-        EternalSynergy,  # => possible EternalSynergy/EternalRomance exploit
-        DoublePulsar,    # => possible DoublePulsar backdoor
-        ViolationPidMid, # => server introduced new PID or MID, a protocol 
-                         #    violation and possible indication of 
-                         #    compromise/backdoor covert channel
-        ViolationCmd,    # => SMBv1 client sent unused/unimplemented command
-        ViolationTx2Cmd, # => SMBv1 client sent unused TRANSACTION2 subcommand
+        EternalBlue,       # => possible EternalBlue exploit
+        EternalSynergy,    # => possible EternalSynergy/EternalRomance exploit
+        EternalChampion,   # => possible EternalChampion exploit
+        DoublePulsar,      # => possible DoublePulsar backdoor
+        ViolationPidMid,   # => server introduced new PID or MID, a protocol 
+                           #    violation and possible indication of 
+                           #    compromise/backdoor covert channel
+        ViolationCmd,      # => SMBv1 client sent unused/unimplemented command
+        ViolationTx2Cmd,   # => SMBv1 client sent unused TRANSACTION2 subcommand
+        ViolationNtRename, # => SMBv1 client sent unimplemented NT_TRANSACT_RENAME
         # TODO: implement this once Zeek has full SMBv1 support
         # ViolationNtTxCmd,# => SMBv1 client sent unused NT_TRANSACT subcommand
     };
@@ -91,6 +100,38 @@ function notice(c: connection, n: Notice::Info)
         }
     }
 
+event signature_match(state: signature_state, msg: string, data: string)
+    {
+    local c = state$conn;
+
+    # Matches on an NT_TRANSACT_RENAME sub-command
+    # NOTE: This is suspicious, because NT_TRANSACT_RENAME is unimplemented in SMBv1
+    # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/95b5e728-7ff1-4e53-a9f2-66f031d86b4c
+    #   > Clients SHOULD NOT send requests using this subcommand code.
+    if (state$sig_id == "smb-nt-transact-rename")
+        notice(c,
+               [$note=ViolationNtRename,
+                $msg=fmt("Suspicious: unimplemented NT_RENAME command sent " +
+                         "by %s:%s to %s:%s",
+                         c$id$orig_h, c$id$orig_p,
+                         c$id$resp_h, c$id$resp_p),
+                $conn=c]);
+
+    # Matches on a single packet containing
+    # SMB_COM_NT_TRANSACT->NT_TRANSACT_RENAME followed by
+    # SMB_COM_NT_TRANSACT_SECONDARY in the same packet.
+    # This is a fuzzy signature-match for EternalChampion.
+    else if (state$sig_id == "smb-nt-transact-rename-secondary")
+        notice(c,
+               [$note=EternalChampion,
+                $msg=fmt("Suspicious: NT_RENAME transaction followed " +
+                         "by NT_SECONDARY in same packet. Possible EternalChampion " +
+                         "exploit from %s:%s to target %s:%s",
+                         c$id$orig_h, c$id$orig_p,
+                         c$id$resp_h, c$id$resp_p),
+                $conn=c]);
+    }
+
 # Track a new SMB command within the current connection
 function seen_smb_command(c: connection, command: count)
     {
@@ -106,6 +147,12 @@ function seen_smb_command(c: connection, command: count)
     else 
         c$es_smb_streams[c$es_current_smb_stream] += command;
     }
+
+function invariant_nt_rename_nt_secondary(c: connection, hdr: SMB1::Header,
+                                          is_orig: bool)
+    {
+    }
+
 
 # Triggers if SMB client sends unimplemented/unused primary SMB command
 function invariant_unused_smb_cmd(c: connection, hdr: SMB1::Header, 
@@ -222,6 +269,7 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
     invariant_new_pid_mid_from_server(c, hdr, is_orig);
     invariant_unused_smb_cmd(c, hdr, is_orig);
     invariant_writex_interleave_tx(c, hdr, is_orig);
+    invariant_nt_rename_nt_secondary(c, hdr, is_orig);
     }
 
 # Produces a notice if an unused/unimplemented TRANS2 sub-command is seen
