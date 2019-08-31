@@ -4,10 +4,12 @@ zeek-EternalSafety
 *EternalSafety* is a Zeek/Bro package for detecting potentially-dangerous SMBv1
 protocol violations, including those leveraged by the infamous
 [Eternal*](https://en.wikipedia.org/wiki/EternalBlue) family of Windows
-exploits. However, rather than identifying these exploits via simple
-signature-matching, *EternalSafety* instead implements a set of SMBv1 protocol
-invariants that encapsulate techniques used by each Eternal* exploit to trigger
-bugs in unpatched Windows systems. 
+exploits. It is capable of detecting EternalBlue,
+EternalSynergy/EternalRomance, EternalChampion, and the DoublePulsar backdoor.
+However, rather than identifying these exploits via simple signature-matching,
+*EternalSafety* instead implements a set of SMBv1 protocol invariants that
+encapsulate techniques used by each Eternal* exploit to trigger bugs in
+unpatched Windows systems. 
 
 *EternalSafety* accurately and reliably identifies the EternalBlue,
 EternalSynergy and EternalRomance exploits, and the DoublePulsar backdoor
