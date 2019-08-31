@@ -14,7 +14,8 @@ export {
                          #    compromise/backdoor covert channel
         ViolationCmd,    # => SMBv1 client sent unused/unimplemented command
         ViolationTx2Cmd, # => SMBv1 client sent unused TRANSACTION2 subcommand
-        ViolationNtTxCmd,# => SMBv1 client sent unused NT_TRANSACT subcommand
+        # TODO: implement this once Zeek has full SMBv1 support
+        # ViolationNtTxCmd,# => SMBv1 client sent unused NT_TRANSACT subcommand
     };
 
     # SMB transactions are uniquely identified by <pid, mid, tid, uid>

@@ -78,9 +78,11 @@ const TRANS2_UNUSED = {
     TRANS2_REPORT_DFS_INCONSISTENCY,
 };
 
+# TODO: implement these once Zeek has finished implementing full SMBv1
+#       support, including for NT_TRANSACT subcommands
 # for SMB_COM_NT_TRANSACT:
-const NT_TRANSACT_RENAME = 0x0005;
+# const NT_TRANSACT_RENAME = 0x0005;
 
-const NT_TRANSACT_UNUSED = {
-    NT_TRANSACT_RENAME,
-};
+# const NT_TRANSACT_UNUSED = {
+#     NT_TRANSACT_RENAME,
+# };
