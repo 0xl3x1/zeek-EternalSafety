@@ -24,6 +24,7 @@ export {
         ViolationCmd,      # => SMBv1 client sent unused/unimplemented command
         ViolationTx2Cmd,   # => SMBv1 client sent unused TRANSACTION2 subcommand
         ViolationNtRename, # => SMBv1 client sent unimplemented NT_TRANSACT_RENAME
+
         # TODO: implement this once Zeek has full SMBv1 support
         # ViolationNtTxCmd,# => SMBv1 client sent unused NT_TRANSACT subcommand
     };
@@ -111,8 +112,8 @@ event signature_match(state: signature_state, msg: string, data: string)
     if (state$sig_id == "smb-nt-transact-rename")
         notice(c,
                [$note=ViolationNtRename,
-                $msg=fmt("Suspicious: unimplemented NT_RENAME command sent " +
-                         "by %s:%s to %s:%s",
+                $msg=fmt("Suspicious: unimplemented NT_TRANSACT_RENAME " +
+                         "command sent by %s:%s to %s:%s",
                          c$id$orig_h, c$id$orig_p,
                          c$id$resp_h, c$id$resp_p),
                 $conn=c]);
