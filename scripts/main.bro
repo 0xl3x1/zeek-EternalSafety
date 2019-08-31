@@ -20,6 +20,13 @@ export {
     };
 
     # SMB transactions are uniquely identified by <pid, mid, tid, uid>
+    # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/9d877a4a-c60c-40e9-8520-849c5a94fc1d
+    #   > All messages that are part of the same transaction MUST have the same
+    #   > UID, TID, PID, and MID values.
+    # and:
+    #   > The client MAY start multiple concurrent transactions as long as at
+    #   > least one of the values of PID or MID differs from all other
+    #   > in-process transactions.
     type SMBTransID: record {
         pid: count; # Process ID
         mid: count; # Multiplex ID
@@ -27,22 +34,27 @@ export {
         uid: count; # User ID
     };
 
+    # This identifies an ongoing SMB command exchange within the connection
+    # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/d0c84681-ee6a-4f6d-b9a0-e9a1cefbbc79
+    #   > All messages that are part of the same command exchange MUST have
+    #   > the same PID and MID values.
     type SMBStreamID: record {
         pid: count; # Process ID
         mid: count; # Multiplex ID
     };
 
-    # Table to track SMBv1 transactions per connection
-    # use a set here because for our TXn invariants we don't care about
-    # command sequence
+    # Table to track set of commands per SMBv1 transactions per connection
+    # NOTE: we use a set here because for our TXn invariants we don't care
+    #       about command ordering within the session
     type SMBTransTable: table[SMBTransID] of set[count];
 
-    # Table to track streams per connection
-    # use a vector because we do care about command sequence for
-    # some of our stream-related invariants
+    # Table to track command sequences per SMBv1 streams per connection
+    # NOTE: we use a vector because we *do* care about exact order of commands
+    #       in the exchange for some of our stream-related invariants
     type SMBStreamTable: table[SMBStreamID] of vector of count;
 
-    # Set of notice types
+    # Set of Notice::Type, used to track which notices we have already raised
+    # per connection so we don't spam notices for the same connection.
     type NoticeSet: set[Notice::Type];
 }
 
@@ -60,16 +72,8 @@ redef record connection += {
     es_notices_issued: NoticeSet &default=NoticeSet();
 };
 
-event bro_init()
-    {
-    }
-
-event connection_established(c: connection)
-    {
-    }
-
-# Issues a new notice if such a notice hasn't already been issued for the
-# current connection
+# Issues a new notice if a notice with the same Notice::Type hasn't already
+# been issued for the current connection.
 function notice(c: connection, n: Notice::Info)
     {
     # Only issue the notice if it hasn't already been issued for this conn
@@ -87,7 +91,7 @@ function notice(c: connection, n: Notice::Info)
         }
     }
 
-# Track a new SMB command as part of the current SMB session
+# Track a new SMB command within the current connection
 function seen_smb_command(c: connection, command: count)
     {
     # track transactions
@@ -164,6 +168,31 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header,
         }
     }
 
+# This invariant produces a notice if an SMB_COM_WRITE_ANDX command appears
+# interleaved with any SMBv1 transaction (which should not happen). 
+# This invariant is violated by the EternalSynergy/EternalRomance exploit.
+# See: https://msrc-blog.microsoft.com/2017/07/13/eternal-synergy-exploit-analysis/
+function invariant_writex_interleave_tx(c: connection, hdr: SMB1::Header,
+                                        is_orig: bool)
+    {
+    # ignore responses from server
+    if (!is_orig)
+        return;
+
+    # Invariant: WRITE_ANDX must NOT be interleaved with SMB_COM_TRANSACTION
+    else if (hdr$command == SMB_COM_WRITE_ANDX && 
+            |SMB_ALL_TRANS_CMDS & c$es_smb_trans[c$es_current_smb_trans]| > 0)
+        notice(c, 
+               [$note=EternalSynergy,
+                $msg=fmt("Possible EternalSynergy/EternalRomance exploit: " +
+                         "SMBv1 WRITE_ANDX command was interleaved with " +
+                         "other transaction type in request from %s:%s " +
+                         "to %s:%s",
+                         c$id$orig_h, c$id$orig_p,
+                         c$id$resp_h, c$id$resp_p),
+                $conn=c]);
+    }
+
 # Note: this gets executed before the other smb1_* events
 # NOTE: if is_orig == T, then the message is a request. Else, it is a resp.
 event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
@@ -189,6 +218,7 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
     # these functions raise notices as appropriate for violations
     invariant_new_pid_mid_from_server(c, hdr, is_orig);
     invariant_unused_smb_cmd(c, hdr, is_orig);
+    invariant_writex_interleave_tx(c, hdr, is_orig);
     }
 
 # Produces a notice if an unused/unimplemented TRANS2 sub-command is seen
@@ -228,27 +258,28 @@ event smb1_transaction2_secondary_request(c: connection, hdr: SMB1::Header,
                     $msg=fmt("SMBv1 proto violation, possible " +
                              "EternalBlue or other buffer exploit: " +
                              "%s:%s tried to interleave NT_TRANSACT " +
-                             "and TRANS2 commands in request to %s:%s",
+                             "and TRANS2_SECONDARY commands in request " +
+                             "to %s:%s",
                              c$id$orig_h, c$id$orig_p,
                              c$id$resp_h, c$id$resp_p),
                     $conn=c]);
     }
 
-event smb1_write_andx_request(c: connection, hdr: SMB1::Header, 
-                              file_id: count, offset: count, data_len: count)
-    {
-    # Invariant: WRITE_ANDX must NOT be interleaved with SMB_COM_TRANSACTION
-    if (|SMB_ALL_TRANS_CMDS & c$es_smb_trans[c$es_current_smb_trans]| > 0)
-        notice(c, 
-               [$note=EternalSynergy,
-                $msg=fmt("Possible EternalSynergy exploit: SMBv1 WRITE_ANDX " +
-                         "interleaved with other transaction type in request " +
-                         "from %s:%s to %s:%s",
-                         c$id$orig_h, c$id$orig_p,
-                         c$id$resp_h, c$id$resp_p),
-                $conn=c]);
-    }
 
-event bro_done()
-    {
-    }
+# TODO: Implement like this once Bro has working smb1_write_andx_* events
+# NOTE: Currently this event doesn't fire correctly due to a suspected Bro
+#       bug, so the invariant is implemented in smb1_message instead.
+# event smb1_write_andx_request(c: connection, hdr: SMB1::Header, 
+#                               file_id: count, offset: count, data_len: count)
+#     {
+#     # Invariant: WRITE_ANDX must NOT be interleaved with SMB_COM_TRANSACTION
+#     if (|SMB_ALL_TRANS_CMDS & c$es_smb_trans[c$es_current_smb_trans]| > 0)
+#         notice(c, 
+#                [$note=EternalSynergy,
+#                 $msg=fmt("Possible EternalSynergy exploit: SMBv1 WRITE_ANDX " +
+#                          "interleaved with other transaction type in request " +
+#                          "from %s:%s to %s:%s",
+#                          c$id$orig_h, c$id$orig_p,
+#                          c$id$resp_h, c$id$resp_p),
+#                 $conn=c]);
+#     }
