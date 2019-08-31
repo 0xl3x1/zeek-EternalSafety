@@ -172,6 +172,7 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header,
 # interleaved with any SMBv1 transaction (which should not happen). 
 # This invariant is violated by the EternalSynergy/EternalRomance exploit.
 # See: https://msrc-blog.microsoft.com/2017/07/13/eternal-synergy-exploit-analysis/
+# TODO: use smb1_write_andx_* events instead, once Bro supports them
 function invariant_writex_interleave_tx(c: connection, hdr: SMB1::Header,
                                         is_orig: bool)
     {
@@ -197,6 +198,7 @@ function invariant_writex_interleave_tx(c: connection, hdr: SMB1::Header,
 # NOTE: if is_orig == T, then the message is a request. Else, it is a resp.
 event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
     {
+    # update our values for current transaction and current cmd exchange
     local current_trans: SMBTransID = [
         $pid = hdr$pid,
         $mid = hdr$mid,
@@ -212,6 +214,7 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
     c$es_current_smb_trans = current_trans;
     c$es_current_smb_stream = current_stream;
 
+    # record the SMBv1 command we just saw
     seen_smb_command(c, hdr$command);
 
     # check that invariants hold
@@ -264,22 +267,3 @@ event smb1_transaction2_secondary_request(c: connection, hdr: SMB1::Header,
                              c$id$resp_h, c$id$resp_p),
                     $conn=c]);
     }
-
-
-# TODO: Implement like this once Bro has working smb1_write_andx_* events
-# NOTE: Currently this event doesn't fire correctly due to a suspected Bro
-#       bug, so the invariant is implemented in smb1_message instead.
-# event smb1_write_andx_request(c: connection, hdr: SMB1::Header, 
-#                               file_id: count, offset: count, data_len: count)
-#     {
-#     # Invariant: WRITE_ANDX must NOT be interleaved with SMB_COM_TRANSACTION
-#     if (|SMB_ALL_TRANS_CMDS & c$es_smb_trans[c$es_current_smb_trans]| > 0)
-#         notice(c, 
-#                [$note=EternalSynergy,
-#                 $msg=fmt("Possible EternalSynergy exploit: SMBv1 WRITE_ANDX " +
-#                          "interleaved with other transaction type in request " +
-#                          "from %s:%s to %s:%s",
-#                          c$id$orig_h, c$id$orig_p,
-#                          c$id$resp_h, c$id$resp_p),
-#                 $conn=c]);
-#     }
