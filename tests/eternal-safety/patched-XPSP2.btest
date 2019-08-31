@@ -1,0 +1,1 @@
+# @TEST-EXEC: bro -C -r $TRACES/shadowbrokers/esteemedaudit-failed-XPSP2.pcap ../../../scripts %INPUT

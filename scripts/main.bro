@@ -1,10 +1,10 @@
-@load smb_consts
-@load-sigs main
+@load ./smb_consts
+@load-sigs ./main
 
 module EternalSafety;
     
 # Set to True to enable some debug prints
-const DEBUG = T;
+const DEBUG = F;
 
 # Increase buffer size, since we rely on some signature matching
 # for EternalChampion (due to lacking SMBv1 event functionality in Bro)

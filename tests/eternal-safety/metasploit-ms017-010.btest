@@ -1,0 +1,2 @@
+# @TEST-EXEC: bro -C -r $TRACES/shadowbrokers/metasploit-ms017-010-win7x64.pcap ../../../scripts %INPUT
+# @TEST-EXEC: btest-diff notice.log
