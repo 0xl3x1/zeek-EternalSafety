@@ -8,6 +8,7 @@ const DEBUG = T;
 export {
     redef enum Notice::Type += {
         EternalBlue,     # => possible EternalBlue exploit
+        EternalSynergy,  # => possible EternalSynergy/EternalRomance exploit
         DoublePulsar,    # => possible DoublePulsar backdoor
         ViolationPidMid, # => server introduced new PID or MID, a protocol 
                          #    violation and possible indication of 
@@ -112,14 +113,15 @@ function invariant_unused_smb_cmd(c: connection, hdr: SMB1::Header,
 
     # else raise notice if this is a client->srv message with an unused command
     else if (hdr$command in SMB_COM_UNUSED)
-            notice(c,[$note=ViolationCmd,
-                      $msg=fmt("SMBv1 proto violation, possibly malicious " +
-                               "activity: %s:%s sent unused/unimplemented " +
-                               "command 0x%x to %s:%s",
-                               c$id$orig_h, c$id$orig_p,
-                               hdr$command,
-                               c$id$resp_h, c$id$resp_p),
-                      $conn=c]);
+            notice(c,
+                   [$note=ViolationCmd,
+                    $msg=fmt("SMBv1 proto violation, possibly malicious " +
+                             "activity: %s:%s sent unused/unimplemented " +
+                             "command 0x%x to %s:%s",
+                             c$id$orig_h, c$id$orig_p,
+                             hdr$command,
+                             c$id$resp_h, c$id$resp_p),
+                    $conn=c]);
     }
 
 # Server is not allowed to introduce a new MID into the stream.
@@ -138,10 +140,11 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header,
         # These MID values in a Trans2 resp are usually used by DoublePulsar
         if (hdr$command == SMB_COM_TRANSACTION2 &&
               hdr$mid >= 81 && hdr$mid <= 83)
-            notice(c,[$note=DoublePulsar,
-                      $msg=fmt("Possible DoublePulsar backdoor detected on %s:%s",
-                               c$id$resp_h, c$id$resp_p),
-                      $conn=c]);
+            notice(c,
+                   [$note=DoublePulsar,
+                    $msg=fmt("Possible DoublePulsar backdoor detected on %s:%s",
+                             c$id$resp_h, c$id$resp_p),
+                    $conn=c]);
         # Any other invalid value => raise a more general notice
         else
             {
@@ -151,11 +154,12 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header,
                 return;
 
             # All other cases are now a violation...
-            notice(c, [$note=ViolationPidMid,
-                       $msg=fmt("Possible compromised SMBv1 server %s:%s " +
-                                "(srv sent new PID/MID - protocol violation)", 
-                                c$id$resp_h, c$id$resp_p),
-                       $conn=c]);
+            notice(c, 
+                   [$note=ViolationPidMid,
+                    $msg=fmt("Possible compromised SMBv1 server %s:%s " +
+                             "(srv sent new PID/MID - protocol violation)", 
+                             c$id$resp_h, c$id$resp_p),
+                    $conn=c]);
             }
         }
     }
@@ -191,14 +195,15 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
 function invariant_unused_trans2_subcmd(c: connection, trans2_sub_cmd: count)
     {
     if (trans2_sub_cmd in TRANS2_UNUSED)
-        notice(c,[$note=ViolationCmd,
-                  $msg=fmt("SMBv1 proto violation, possibly malicious " +
-                           "activity: %s:%s sent unused/unimplemented " +
-                           "TRANSACTION2 subcommand 0x%04x to %s:%s",
-                           c$id$orig_h, c$id$orig_p,
-                           trans2_sub_cmd,
-                           c$id$resp_h, c$id$resp_p),
-                  $conn=c]);
+        notice(c,
+               [$note=ViolationCmd,
+                $msg=fmt("SMBv1 proto violation, possibly malicious " +
+                         "activity: %s:%s sent unused/unimplemented " +
+                         "TRANSACTION2 subcommand 0x%04x to %s:%s",
+                         c$id$orig_h, c$id$orig_p,
+                         trans2_sub_cmd,
+                         c$id$resp_h, c$id$resp_p),
+                $conn=c]);
     }
 
 # Trans2 Request (0x32) MS-2.2.4.46.1
@@ -209,6 +214,8 @@ event smb1_transaction2_request(c: connection, hdr: SMB1::Header,
     }
 
 # Trans2 Secondary Request (0x33) MS:2.2.4.47.1
+# Check here for interleaving NT_TRANSACT and TRANS2 commands, which are a
+# protocol violation and probably indicate an exploit attempt
 event smb1_transaction2_secondary_request(c: connection, hdr: SMB1::Header,
                                           args: SMB1::Trans2_Sec_Args, 
                                           parameters: string, data: string)
@@ -216,14 +223,30 @@ event smb1_transaction2_secondary_request(c: connection, hdr: SMB1::Header,
     # SMB protocol violation used by EternalBlue:
     # NT_TRANSACT and TRANSACTION2 transaction types must NOT be interleaved.
     if (SMB_COM_NT_TRANSACT in c$es_smb_trans[c$es_current_smb_trans])
-            notice(c, [$note=EternalBlue,
-                       $msg=fmt("SMBv1 proto violation, possible " +
-                                "EternalBlue or other buffer exploit: " +
-                                "%s:%s tried to interleave NT_TRANSACT " +
-                                "and TRANS2 commands in request to %s:%s",
-                                c$id$orig_h, c$id$orig_p,
-                                c$id$resp_h, c$id$resp_p),
-                       $conn=c]);
+            notice(c, 
+                   [$note=EternalBlue,
+                    $msg=fmt("SMBv1 proto violation, possible " +
+                             "EternalBlue or other buffer exploit: " +
+                             "%s:%s tried to interleave NT_TRANSACT " +
+                             "and TRANS2 commands in request to %s:%s",
+                             c$id$orig_h, c$id$orig_p,
+                             c$id$resp_h, c$id$resp_p),
+                    $conn=c]);
+    }
+
+event smb1_write_andx_request(c: connection, hdr: SMB1::Header, 
+                              file_id: count, offset: count, data_len: count)
+    {
+    # Invariant: WRITE_ANDX must NOT be interleaved with SMB_COM_TRANSACTION
+    if (|SMB_ALL_TRANS_CMDS & c$es_smb_trans[c$es_current_smb_trans]| > 0)
+        notice(c, 
+               [$note=EternalSynergy,
+                $msg=fmt("Possible EternalSynergy exploit: SMBv1 WRITE_ANDX " +
+                         "interleaved with other transaction type in request " +
+                         "from %s:%s to %s:%s",
+                         c$id$orig_h, c$id$orig_p,
+                         c$id$resp_h, c$id$resp_p),
+                $conn=c]);
     }
 
 event bro_done()

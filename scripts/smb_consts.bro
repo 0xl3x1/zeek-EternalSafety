@@ -2,9 +2,23 @@ module EternalSafety;
 
 # Relevant SMBv1 commands
 const SMB_COM_NT_TRANSACT = 0xA0;
+const SMB_COM_NT_TRANSACT_SECONDARY = 0xA1;
+const SMB_COM_TRANSACTION = 0x25;
+const SMB_COM_TRANSACTION_SECONDARY = 0x26;
 const SMB_COM_TRANSACTION2 = 0x32;
 const SMB_COM_TRANSACTION2_SECONDARY = 0x33;
 const SMB_COM_LOCKING_ANDX = 0x24;
+const SMB_COM_WRITE_ANDX = 0x2F;
+
+# The set of all SMBv1 transaction commands
+const SMB_ALL_TRANS_CMDS = {
+    SMB_COM_NT_TRANSACT,
+    SMB_COM_NT_TRANSACT_SECONDARY,
+    SMB_COM_TRANSACTION,
+    SMB_COM_TRANSACTION_SECONDARY,
+    SMB_COM_TRANSACTION2,
+    SMB_COM_TRANSACTION2_SECONDARY,
+};
 
 # Unimplemented/reserved primary commands
 # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/32b5d4b7-d90b-483f-ad6a-003fd110f0ec
@@ -17,6 +31,7 @@ const SMB_COM_READ_BULK           = 0xD8;
 const SMB_COM_WRITE_BULK          = 0xD9;
 const SMB_COM_WRITE_BULK_DATA     = 0xDA;
 
+# Set of all SMBv1 commands that are unused and/or unimplemented
 const SMB_COM_UNUSED = {
     SMB_COM_QUERY_SERVER,
     SMB_COM_IOCTL_SECONDARY,
