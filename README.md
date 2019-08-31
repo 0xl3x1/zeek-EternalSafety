@@ -44,13 +44,16 @@ an even broader set of invariants encompassing more of the SMBv1 specification,
 and even to expand this to SMBv2.
 
 Note that although the bugs exploited by the Eternal* exploits have been
-patched *EternalSafety* still serves a clear purpose. A huge number of
+patched, *EternalSafety* still serves a clear purpose. A huge number of
 unpatched machines remain in use in networks around the world, and this family
-of exploits remains in widespread use by malicious actors and malware. It is
-also still common for organizations to run older versions of Windows to support
-legacy applications. Additionally, there may be other, as-of-yet undiscovered,
-SMBv1 bugs in Windows systems, whose exploitation may be detected by
-*EternalSafety*. 
+of exploits remains [in widespread
+use](https://www.sentinelone.com/blog/eternalblue-nsa-developed-exploit-just-wont-die/)
+by malicious actors and
+[malware](https://techcrunch.com/2019/05/12/wannacry-two-years-on/). It is also
+still common for organizations to run older versions of Windows to support
+legacy applications. Additionally, there may be other as-of-yet undiscovered
+SMBv1 bugs in Windows systems, whose exploitation *EternalSafety* may be able
+to detect.
 
 Installation
 ------------
