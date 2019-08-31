@@ -149,12 +149,6 @@ function seen_smb_command(c: connection, command: count)
         c$es_smb_streams[c$es_current_smb_stream] += command;
     }
 
-function invariant_nt_rename_nt_secondary(c: connection, hdr: SMB1::Header,
-                                          is_orig: bool)
-    {
-    }
-
-
 # Triggers if SMB client sends unimplemented/unused primary SMB command
 function invariant_unused_smb_cmd(c: connection, hdr: SMB1::Header, 
                                   is_orig: bool)
@@ -270,7 +264,6 @@ event smb1_message(c: connection, hdr: SMB1::Header, is_orig: bool)
     invariant_new_pid_mid_from_server(c, hdr, is_orig);
     invariant_unused_smb_cmd(c, hdr, is_orig);
     invariant_writex_interleave_tx(c, hdr, is_orig);
-    invariant_nt_rename_nt_secondary(c, hdr, is_orig);
     }
 
 # Produces a notice if an unused/unimplemented TRANS2 sub-command is seen
