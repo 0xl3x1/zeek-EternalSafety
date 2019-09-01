@@ -121,7 +121,10 @@ field value mid-transaction (a violation of the SMBv1 protocol specification),
 AND the new value is in the range 81 <= `MID` < 84.
 
 DoublePulsar uses the value of `MID` as a covert channel for receiving commands
-and sending back status codes.
+and sending back status codes, and sends back a status code of `81` or `82` to
+indicate successful installation. Note that even if the value sent back
+differs, any use of `MID` as a communication channel would still be detected by
+the superset notice EternalSafety::ViolationPidMid.
 
 ### EternalSafety::ViolationPidMid
 
