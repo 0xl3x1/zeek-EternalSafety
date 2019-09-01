@@ -187,8 +187,9 @@ According to the SMBv1 specification for NT_TRANSACT_RENAME:
 
 Hence, use of this subcommand is automatically suspicious and may indicate
 a buggy client or malicious exploit attempt. This subcommand is used by several
-exploits to trigger execution of a malicious injected event handler. See:
-https://msrc-blog.microsoft.com/2017/06/29/eternal-champion-exploit-analysis/
+exploits to trigger execution of a malicious injected event handler.
+
+See: https://msrc-blog.microsoft.com/2017/06/29/eternal-champion-exploit-analysis/
 
 About
 -----
