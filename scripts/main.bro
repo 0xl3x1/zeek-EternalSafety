@@ -271,7 +271,7 @@ function invariant_unused_trans2_subcmd(c: connection, trans2_sub_cmd: count)
     {
     if (trans2_sub_cmd in TRANS2_UNUSED)
         notice(c,
-               [$note=ViolationCmd,
+               [$note=ViolationTx2Cmd,
                 $msg=fmt("SMBv1 proto violation, possibly malicious " +
                          "activity: %s:%s sent unused/unimplemented " +
                          "TRANSACTION2 subcommand 0x%04x to %s:%s",
