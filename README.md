@@ -17,9 +17,8 @@ implant. Due to limitations in Zeek's SMBv1 support, it has limited support for
 detecting EternalChampion via signature-matching. *EternalSafety* also
 identifies a range of other protocol violations, such as the use of
 unimplemented/unused SMBv1 commands, server-initiated changes in values that
-may only be set by an SMBv1 client, incorrect interleaving of transaction
-types, incorrect ordering of transaction messages, and sending more data as
-part of a transaction than was specified in the transaction request.
+may only be set by an SMBv1 client, and incorrect interleaving of transaction
+types.
 
 Rationale
 ---------
