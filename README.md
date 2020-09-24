@@ -189,8 +189,3 @@ a buggy client or malicious exploit attempt. This subcommand is used by several
 exploits to trigger execution of a malicious injected event handler.
 
 See: https://msrc-blog.microsoft.com/2017/06/29/eternal-champion-exploit-analysis/
-
-About
------
-
-Written by Lexi Brent [lexi.brent@sydney.edu.au](mailto:lexi.brent@sydney.edu.au)
