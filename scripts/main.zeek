@@ -2,13 +2,13 @@
 @load-sigs ./main
 
 module EternalSafety;
-    
+
 # Set to True to enable some debug prints
 const DEBUG = F;
 
 # Increase buffer size, since we rely on some signature matching
-# for EternalChampion (due to lacking SMBv1 event functionality in Bro)
-# TODO: Remove this when Bro's SMBv1 event support is complete and covers the
+# for EternalChampion (due to lacking SMBv1 event functionality in Zeek)
+# TODO: Remove this when Zeek's SMBv1 event support is complete and covers the
 #       SMB_COM_NT_TRANSACT* commands
 redef dpd_buffer_size = 8192;
 
@@ -18,8 +18,8 @@ export {
         EternalSynergy,    # => possible EternalSynergy/EternalRomance exploit
         EternalChampion,   # => possible EternalChampion exploit
         DoublePulsar,      # => possible DoublePulsar backdoor
-        ViolationPidMid,   # => server introduced new PID or MID, a protocol 
-                           #    violation and possible indication of 
+        ViolationPidMid,   # => server introduced new PID or MID, a protocol
+                           #    violation and possible indication of
                            #    compromise/backdoor covert channel
         ViolationCmd,      # => SMBv1 client sent unused/unimplemented command
         ViolationTx2Cmd,   # => SMBv1 client sent unused TRANSACTION2 subcommand
@@ -139,18 +139,18 @@ function seen_smb_command(c: connection, command: count)
     # track transactions
     if (c$es_current_smb_trans !in c$es_smb_trans)
         c$es_smb_trans[c$es_current_smb_trans] = set(command);
-    else 
+    else
         add c$es_smb_trans[c$es_current_smb_trans][command];
 
     # track the stream
     if (c$es_current_smb_stream !in c$es_smb_streams)
         c$es_smb_streams[c$es_current_smb_stream] = vector(command);
-    else 
+    else
         c$es_smb_streams[c$es_current_smb_stream] += command;
     }
 
 # Triggers if SMB client sends unimplemented/unused primary SMB command
-function invariant_unused_smb_cmd(c: connection, hdr: SMB1::Header, 
+function invariant_unused_smb_cmd(c: connection, hdr: SMB1::Header,
                                   is_orig: bool)
     {
     # if this is a response from the server, just ignore it
@@ -200,10 +200,10 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header,
                 return;
 
             # All other cases are now a violation...
-            notice(c, 
+            notice(c,
                    [$note=ViolationPidMid,
                     $msg=fmt("Possible compromised SMBv1 server %s:%s " +
-                             "(srv sent new PID/MID - protocol violation)", 
+                             "(srv sent new PID/MID - protocol violation)",
                              c$id$resp_h, c$id$resp_p),
                     $conn=c]);
             }
@@ -211,10 +211,10 @@ function invariant_new_pid_mid_from_server(c: connection, hdr: SMB1::Header,
     }
 
 # This invariant produces a notice if an SMB_COM_WRITE_ANDX command appears
-# interleaved with any SMBv1 transaction (which should not happen). 
+# interleaved with any SMBv1 transaction (which should not happen).
 # This invariant is violated by the EternalSynergy/EternalRomance exploit.
 # See: https://msrc-blog.microsoft.com/2017/07/13/eternal-synergy-exploit-analysis/
-# TODO: use smb1_write_andx_* events instead, once Bro supports them
+# TODO: use smb1_write_andx_* events instead, once Zeek supports them
 function invariant_writex_interleave_tx(c: connection, hdr: SMB1::Header,
                                         is_orig: bool)
     {
@@ -223,9 +223,9 @@ function invariant_writex_interleave_tx(c: connection, hdr: SMB1::Header,
         return;
 
     # Invariant: WRITE_ANDX must NOT be interleaved with SMB_COM_TRANSACTION
-    else if (hdr$command == SMB_COM_WRITE_ANDX && 
+    else if (hdr$command == SMB_COM_WRITE_ANDX &&
             |SMB_ALL_TRANS_CMDS & c$es_smb_trans[c$es_current_smb_trans]| > 0)
-        notice(c, 
+        notice(c,
                [$note=EternalSynergy,
                 $msg=fmt("Possible EternalSynergy/EternalRomance exploit: " +
                          "SMBv1 WRITE_ANDX command was interleaved with " +
@@ -282,7 +282,7 @@ function invariant_unused_trans2_subcmd(c: connection, trans2_sub_cmd: count)
     }
 
 # Trans2 Request (0x32) MS-2.2.4.46.1
-event smb1_transaction2_request(c: connection, hdr: SMB1::Header, 
+event smb1_transaction2_request(c: connection, hdr: SMB1::Header,
                                 args: SMB1::Trans2_Args, sub_cmd: count)
     {
     invariant_unused_trans2_subcmd(c, sub_cmd);
@@ -292,13 +292,13 @@ event smb1_transaction2_request(c: connection, hdr: SMB1::Header,
 # Check here for interleaving NT_TRANSACT and TRANS2 commands, which are a
 # protocol violation and probably indicate an exploit attempt
 event smb1_transaction2_secondary_request(c: connection, hdr: SMB1::Header,
-                                          args: SMB1::Trans2_Sec_Args, 
+                                          args: SMB1::Trans2_Sec_Args,
                                           parameters: string, data: string)
     {
     # SMB protocol violation used by EternalBlue:
     # NT_TRANSACT and TRANSACTION2 transaction types must NOT be interleaved.
     if (SMB_COM_NT_TRANSACT in c$es_smb_trans[c$es_current_smb_trans])
-            notice(c, 
+            notice(c,
                    [$note=EternalBlue,
                     $msg=fmt("SMBv1 proto violation, possible " +
                              "EternalBlue or other buffer exploit: " +

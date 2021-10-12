@@ -1,2 +1,2 @@
-# @TEST-EXEC: bro -C -r $TRACES/eternalchampion.pcap ../../../scripts %INPUT
+# @TEST-EXEC: zeek -C -r $TRACES/eternalchampion.pcap ../../../scripts %INPUT
 # @TEST-EXEC: btest-diff notice.log
