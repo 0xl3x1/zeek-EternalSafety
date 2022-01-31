@@ -1,2 +1,3 @@
-# @TEST-EXEC: bro -C -r $TRACES/shadowbrokers/eternalblue-success-unpatched-win7.pcap ../../../scripts %INPUT
+# @TEST-EXEC: zeek -C -r $TRACES/shadowbrokers/eternalblue-success-unpatched-win7.pcap ../../../scripts %INPUT
+# @TEST-EXEC: zeek-cut id.orig_h id.orig_p id.resp_h id.resp_p proto note msg sub src dst p < notice.log > notice.tmp && mv notice.tmp notice.log
 # @TEST-EXEC: btest-diff notice.log

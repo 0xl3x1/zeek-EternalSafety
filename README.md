@@ -1,7 +1,7 @@
 zeek-EternalSafety
 ==================
 
-*EternalSafety* is a Zeek/Bro package for detecting potentially-dangerous SMBv1
+*EternalSafety* is a Zeek package for detecting potentially-dangerous SMBv1
 protocol violations that encapsulate bugs exploited by the infamous
 [Eternal*](https://en.wikipedia.org/wiki/EternalBlue) family of Windows
 exploits. It is capable of detecting EternalBlue,
