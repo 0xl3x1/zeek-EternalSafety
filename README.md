@@ -60,7 +60,7 @@ Installation
 This package can be installed through the Zeek package manager:
 
     zkg refresh
-    zkg install lexibrent/zeek-EternalSafety
+    zkg install 0xl3x1/zeek-EternalSafety
 
 
 Usage
@@ -189,3 +189,10 @@ a buggy client or malicious exploit attempt. This subcommand is used by several
 exploits to trigger execution of a malicious injected event handler.
 
 See: https://msrc-blog.microsoft.com/2017/06/29/eternal-champion-exploit-analysis/
+
+Contributing
+------------
+
+This package is considered stable and is **not** being actively developed. However, bugfixes and other pull requests are welcomed, and will be reviewed on a best-effort basis.
+
+Note that this package is deployed on a significant number of production Zeek instances, so please ensure that any changes have been **thoroughly** tested, including on live traffic if possible, and that all pull requests include good test coverage.
