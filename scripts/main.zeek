@@ -14,16 +14,33 @@ redef dpd_buffer_size = 8192;
 
 export {
     redef enum Notice::Type += {
-        EternalBlue,       # => possible EternalBlue exploit
-        EternalSynergy,    # => possible EternalSynergy/EternalRomance exploit
-        EternalChampion,   # => possible EternalChampion exploit
-        DoublePulsar,      # => possible DoublePulsar backdoor
-        ViolationPidMid,   # => server introduced new PID or MID, a protocol
-                           #    violation and possible indication of
-                           #    compromise/backdoor covert channel
-        ViolationCmd,      # => SMBv1 client sent unused/unimplemented command
-        ViolationTx2Cmd,   # => SMBv1 client sent unused TRANSACTION2 subcommand
-        ViolationNtRename, # => SMBv1 client sent unimplemented NT_TRANSACT_RENAME
+        ## SMBv1 protocol violation, possible EternalBlue or other buffer
+        ## exploit: NT_TRANSACT and TRANS2_SECONDARY commands interleaved in
+        ## request.
+        EternalBlue,
+
+        ## SMBv1 WRITE_ANDX command was interleaved with other transaction type
+        ## in request.
+        EternalSynergy,
+
+        ## SMVv1 NT_RENAME transaction followed by NT_SECONDARY in same packet.
+        EternalChampion,
+
+        ## Possible DoublePulsar back-door detected.
+        DoublePulsar,
+
+        ## SMBv1 server introduced new PID or MID, a protocol violation and
+        ## possible indication of compromise/backdoor covert channel.
+        ViolationPidMid,
+
+        ## SMBv1 client sent unused/unimplemented command.
+        ViolationCmd,
+
+        ## SMBv1 client sent unused TRANSACTION2 subcommand.
+        ViolationTx2Cmd,
+
+        ## SMBv1 client sent unimplemented NT_TRANSACT_RENAME.
+        ViolationNtRename,
 
         # TODO: implement this once Zeek has full SMBv1 support
         # ViolationNtTxCmd,# => SMBv1 client sent unused NT_TRANSACT subcommand
